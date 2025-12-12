@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行儀のよいタイピング</title>
+  <style>
+    body {
+      background-color: yellow;
+    }
+
+    #startScreen {
+      text-align: center;
+    }
+
+    #gameScreen {
+      text-align: center;
+      display: none;
+    }
+
+    #answer {
+      opacity: 0;
+      position: absolute;
+      pointer-events: none;
+    }
+
+    #over {
+      text-align: center;
+      color: red;
+      font-size: 200px;
+      display: none;
+    }
+
+    #finish {
+      color: blue;
+      text-align: center;
+      font-size: 90px;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="startScreen">
+    <h1>行儀のよいタイピング2</h1>
+    <p>Enterでスタート</p>
+  </div>
+
+
+  <div id="gameScreen">
+    <h1 id="timer">15</h1>
+    <div id="topRow">
+      <h1 id="question"></h1>
+
+
+
+      <p id="hurigana"></p>
+      <input type="text" id="answer">
+      <p id="message"></p>
+    </div>
+  </div>
+  <h1 id="over">終</h1>
+  <h1 id="finish">おわりおつかれ</h1>
+  <script type="module">
+    import { polite } from './polite.js'
+    const startScreen = document.querySelector('#startScreen');
+    const gameScreen = document.querySelector('#gameScreen');
+    const over = document.querySelector('#over');
+    const finish = document.querySelector('#finish');
+    const timerH1 = document.querySelector('#timer');
+    const question = document.querySelector('#question');
+    const hurigana = document.querySelector('#hurigana');
+    const answer = document.querySelector('#answer');
+    const message = document.querySelector('#message');
+
+    //外出し変数
+    let countT = 15;
+    let questionN = 0;
+    let displayRomaji = '';
+    let innerRomaji = '';
+    let timerID = '';
+
+    const timer = () => {
+      timerID = setInterval(() => {
+        countT--;
+        timerH1.textContent = countT;
+        if (countT < 0) {
+          gameScreen.style.display = 'none';
+          over.style.display = 'block';
+          document.body.style.backgroundColor = 'black';
+
+        }
+      }, 1000)
+    };
+
+    const shuffle = () => {
+      for (let i = polite.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [polite[i], polite[j]] = [polite[j], polite[i]];
+      }
+    };
+
+    const showQuestion = () => {
+      const q = polite[questionN];
+      question.textContent = q.original;
+      hurigana.textContent = q.romaji;
+
+      displayRomaji = q.romaji;
+      innerRomaji = q.romaji.replace(/\s+/g, '');
+
+      answer.disabled = false;
+      answer.value = '';
+
+      message.textContent = ''
+    };
+
+    //ゲームスタートなので一回でいい
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        startScreen.style.display = 'none';
+        gameScreen.style.display = 'block';
+        timer();
+        shuffle();
+        showQuestion();
+      }
+    }
+      , { once: true });
+
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (/^[a-z-]$/.test(key)) {
+        answer.value += key;
+
+        answer.dispatchEvent(new Event('input'));
+      }
+      if (e.key === 'Enter') {
+    if(answer.value.replace(/\s+/g, '')===innerRomaji){
+      questionN++;
+      countT+=6;
+      message.textContent='的中　＋５秒';
+
+      if(questionN===polite.length){
+        gameScreen.style.display='none';
+        finish.style.display='block';
+        clearInterval(timerID);
+        //今は知ってるイベントをremoveする
+        //安全にやるなら関数名をつけてあげるといい
+        window.removeEventListener('keydown',arguments.callee);
+        return;
+      }
+      setTimeout(()=>{
+        showQuestion();
+      },1000)
+    }
+      }
+    });
+
+    //そこにあるものをただ読んで色分けする通過点
+    answer.addEventListener('input', () => {
+
+
+      //入力のたびにmismatchをリセット
+      let mismatch = false;
+      //書き込まれたもののスペースを省く
+      const typed = answer.value.replace(/\s+/g, '');
+
+      //内部用と照らし合わせた正解文字数
+      let correctLength = 0;
+      //打たれた文字数分以下の処理を実行
+      for (let i = 0; i < typed.length; i++) {
+        //打たれた文字のi番目と内部用のi番目が正しければ正解文字数を増やす
+        if (typed[i] === innerRomaji[i]) {
+          correctLength++;
+        } else {
+          mismatch = true;
+          break;
+        }
+      }
+      //失敗したときの処理↓
+      if (mismatch) {
+        answer.disabled = true;
+        message.textContent = 'やり直し'
+        hurigana.innerHTML = displayRomaji;
+
+        setTimeout(() => {
+          mismatch = false;
+          answer.disabled = false;
+          answer.value = '';
+
+          message.textContent = '';
+
+
+        }, 500);
+        return;
+      }
+      //displayRomajiのカウント↓
+      let countD = 0;
+      let highlightIndex = 0;
+      for (let i = 0; i < displayRomaji.length; i++) {
+        if (displayRomaji[i] !== ' ') {
+          countD++;
+        }
+        if (countD === correctLength) {
+          highlightIndex = i + 1;
+          break;
+        }
+      }
+      const ok = displayRomaji.substring(0, highlightIndex);
+      const yet = displayRomaji.substring(highlightIndex);
+      hurigana.innerHTML = `<span style='color:red'>${ok}</span>${yet}`
+    });
+
+    //インプットにフォーカスを当てたままでwindowからの入力をすると二重入力になる
+    //インプットするという動作は本来フォーカスを当てて自分で入力するということ
+
+
+
+
+  </script>
